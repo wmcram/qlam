@@ -4,11 +4,30 @@ use std::{
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+enum Constant {
+    Zero,
+    One,
+    H,
+    S,
+    CNOT,
+    X,
+    Y,
+    Z,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum Term {
     Var(String),
     Abs(String, Box<Term>),
     App(Box<Term>, Box<Term>),
-    Split(Box<Term>, Box<Term>),
+}
+
+// Determines whether the term is a (non-stuck, irreducible) value
+fn is_value(t: &Term) -> bool {
+    match t {
+        Term::Var(_) | Term::Abs(_, _) => true,
+        _ => false,
+    }
 }
 
 // Gets the free variables of a lambda term.
@@ -17,7 +36,6 @@ fn free_vars(t: &Term) -> HashSet<String> {
         Term::Var(x) => [x.clone()].into_iter().collect(),
         Term::Abs(x, body) => &free_vars(body) - &[x.clone()].into_iter().collect(),
         Term::App(a, b) => &free_vars(a) | &free_vars(b),
-        Term::Split(a, b) => &free_vars(a) | &free_vars(b),
     }
 }
 
@@ -56,16 +74,13 @@ fn subst(t: &Term, x: &str, s: &Term) -> Term {
             }
         }
         Term::App(a, b) => Term::App(Box::new(subst(a, x, s)), Box::new(subst(b, x, s))),
-        Term::Split(a, b) => Term::Split(Box::new(subst(a, x, s)), Box::new(subst(b, x, s))),
     }
 }
 
 // Steps this term one time, returning None if irreducible (we don't reduce under lambdas)
 fn small_step(t: &Term) -> Option<Term> {
     match t {
-        Term::Var(_) => None,
-        Term::Split(_, _) => None,
-        Term::Abs(_, _) => None,
+        Term::Var(_) | Term::Abs(_, _) => None,
         Term::App(a, b) => match &**a {
             Term::Abs(x, body) => Some(subst(body, x, b)),
             _ => {
@@ -99,7 +114,6 @@ impl std::fmt::Display for Term {
             Term::Var(x) => write!(f, "{x}"),
             Term::Abs(x, body) => write!(f, "(λ{x}. {body})"),
             Term::App(a, b) => write!(f, "({a} {b})"),
-            Term::Split(a, b) => write!(f, "({a} | {b})"),
         }
     }
 }
