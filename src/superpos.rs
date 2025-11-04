@@ -27,7 +27,7 @@ impl Superpos {
 
     // Maps the function over the branches of the superposition, flattening any newly-generated
     // superpositions into the toplevel one.
-    fn map_terms<F>(&self, f: F) -> Self
+    pub fn map_terms<F>(&self, f: F) -> Self
     where
         F: Fn(Term) -> Value,
     {
@@ -48,7 +48,7 @@ impl Superpos {
 
     // Maps the binary function over both superpositions, taking their branchwise product and
     // flattening as in map_terms.
-    fn zip_terms<F>(&self, other: &Superpos, f: F) -> Self
+    pub fn zip_terms<F>(&self, other: &Superpos, f: F) -> Self
     where
         F: Fn(Term, Term) -> Value,
     {
@@ -89,5 +89,15 @@ impl Superpos {
             .last()
             .expect("State vector cannot be empty")
             .0
+    }
+}
+
+impl std::fmt::Display for Superpos {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "[")?;
+        for (t, amp) in &self.0 {
+            writeln!(f, "({t}): {amp},")?;
+        }
+        writeln!(f, "]")
     }
 }
