@@ -1,4 +1,4 @@
-pub mod state;
+pub mod superpos;
 pub mod term;
 
 fn main() {
