@@ -53,7 +53,7 @@ pub enum ParseError {
     EmptyList,
 }
 
-pub fn parse(tokens: &[Token]) -> Result<Term, ParseError> {
+fn parse_tokens(tokens: &[Token]) -> Result<Term, ParseError> {
     let mut i = 0;
     let mut res = Vec::new();
     while i < tokens.len() {
@@ -69,7 +69,7 @@ pub fn parse(tokens: &[Token]) -> Result<Term, ParseError> {
                         }
                         Token::RPar(_) => {
                             if depth == 0 {
-                                let inner = parse(&tokens[i + 1..=j - 1])?;
+                                let inner = parse_tokens(&tokens[i + 1..=j - 1])?;
                                 res.push(inner);
                                 pushed = true;
                                 break;
@@ -92,7 +92,7 @@ pub fn parse(tokens: &[Token]) -> Result<Term, ParseError> {
                     return Err(ParseError::MissingBody(*pos));
                 }
                 if let Some(Token::Var(_, x)) = tokens.get(i + 1) {
-                    let rest = parse(&tokens[i + 2..])?;
+                    let rest = parse_tokens(&tokens[i + 2..])?;
                     res.push(abs(x, rest));
                     i = tokens.len();
                 } else {
@@ -109,4 +109,9 @@ pub fn parse(tokens: &[Token]) -> Result<Term, ParseError> {
         Some(res) => Ok(res),
         None => Err(ParseError::EmptyList),
     }
+}
+
+pub fn parse(input: &mut Chars) -> Result<Term, ParseError> {
+    let tokens = tokenize(input);
+    parse_tokens(&tokens)
 }
