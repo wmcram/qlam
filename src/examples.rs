@@ -12,3 +12,8 @@ pub fn omega() -> Term {
     let inner = abs("x", app(var("x"), var("x")));
     app(inner.clone(), inner)
 }
+
+// Creates an EPR pair term.
+pub fn epr() -> Term {
+    todo!()
+}
