@@ -129,7 +129,7 @@ fn apply_gate(g: &str, k: &Vec<bool>) -> Value {
                 ])),
             }
         }
-        "CNOT" => {
+        "C" => {
             assert!(k.len() == 2);
             match (k[0], k[1]) {
                 (false, false) => Value::Superpos(Superpos(vec![(

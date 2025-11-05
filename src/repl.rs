@@ -1,4 +1,7 @@
-use crate::{parser::parse, term::Term};
+use crate::{
+    parser::parse,
+    term::{Term, eval},
+};
 use std::{collections::HashMap, io::Write};
 
 // A symbol -> term mapping for the REPL environment.
@@ -29,7 +32,7 @@ fn repl_line(line: &str, env: &mut Env) {
         }
     } else {
         match parse(&mut line.chars()) {
-            Ok(t) => println!("{t}"),
+            Ok(t) => println!("{}", eval(t)),
             Err(e) => println!("{:?}", e),
         }
     }
