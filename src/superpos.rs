@@ -12,7 +12,7 @@ impl Superpos {
     }
 
     // Merges identical terms in the branches of the superposition.
-    fn merge(&mut self) {
+    pub fn merge(&mut self) {
         let mut merged: Vec<(Term, Complex<f64>)> = Vec::new();
         for (t, amp) in self.0.iter() {
             if let Some((_, cur)) = merged.iter_mut().find(|(u, _)| *u == *t) {

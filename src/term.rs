@@ -186,7 +186,10 @@ fn apply(v1: Value, v2: Value) -> Value {
     };
     match res {
         Value::Term(t) => eval(t),
-        Value::Superpos(_) => res,
+        Value::Superpos(mut s) => {
+            s.merge();
+            Value::Superpos(s)
+        }
     }
 }
 
