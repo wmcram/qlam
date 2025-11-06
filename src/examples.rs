@@ -1,19 +1,17 @@
 use crate::helpers::{abs, app, gate, ket, var};
+use crate::repl::{self, Env, repl_line};
 use crate::term::Term;
 
-// Returns a term representing an even superposition of |0> and |1>
-pub fn even() -> Term {
-    let app_had = abs("x", app(gate("H"), var("x")));
-    app(app_had, ket(vec![false]))
+// Loads in a "standard library" for classical lambda calculus
+pub fn load_stdlib(env: &mut Env) {
+    repl_line("true = \\x.\\y.x", env);
+    repl_line("false = \\x.\\y.y", env);
+    repl_line("cons = \\x.\\y.\\b.b x y", env);
+    repl_line("fst = \\p.p true", env);
+    repl_line("snd = \\p.p false", env);
 }
 
-// Returns the Omega term, which diverges in classical lambda calculus.
-pub fn omega() -> Term {
-    let inner = abs("x", app(var("x"), var("x")));
-    app(inner.clone(), inner)
-}
-
-// Creates an EPR pair term.
-pub fn epr() -> Term {
-    todo!()
+// Loads in a library with some basic quantum algorithms
+pub fn load_qntmlib(env: &mut Env) {
+    repl_line("epr = C (cons (H |0>) |0>)", env);
 }

@@ -1,4 +1,5 @@
 use crate::{
+    examples::load_stdlib,
     parser::parse,
     term::{Value, eval},
 };
@@ -25,7 +26,7 @@ impl Env {
 }
 
 // Processes a line of input and performs the corresponding effects.
-fn repl_line(line: &str, env: &mut Env) {
+pub fn repl_line(line: &str, env: &mut Env) {
     if let Some((name, term)) = line.split_once('=') {
         match parse(&mut term.trim().chars()) {
             Ok(t) => match eval(t, env) {
@@ -50,6 +51,7 @@ pub fn repl() -> Result<()> {
     let mut rl = DefaultEditor::new()?;
 
     let mut env = Env::new();
+    load_stdlib(&mut env);
     loop {
         match rl.readline("qlam> ") {
             Ok(line) => {
