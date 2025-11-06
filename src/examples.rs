@@ -1,6 +1,4 @@
-use crate::helpers::{abs, app, gate, ket, var};
-use crate::repl::{self, Env, repl_line};
-use crate::term::Term;
+use crate::repl::{Env, repl_line};
 
 // Loads in a "standard library" for classical lambda calculus
 pub fn load_stdlib(env: &mut Env) {

@@ -31,7 +31,7 @@ pub fn superpos(v: Vec<(Term, Complex<f64>)>) -> Value {
 }
 
 // Convenience function for constructing kets.
-pub fn ket(k: Vec<bool>) -> Term {
+pub fn ket(k: bool) -> Term {
     Term::Const(Const::Ket(k))
 }
 
@@ -43,4 +43,8 @@ pub fn bit(b: bool) -> Term {
 // Convenience function for constructing measurements.
 pub fn meas() -> Term {
     Term::Const(Const::Meas)
+}
+
+pub fn pair(t1: Term, t2: Term) -> Term {
+    abs("b", app(app(var("b"), t1), t2))
 }

@@ -110,28 +110,17 @@ fn parse_tokens(tokens: &[Token]) -> Result<Term, ParseError> {
             }
             Token::RPar(pos) => return Err(ParseError::UnopenedPar(*pos)),
             Token::LKet(pos) => {
-                let mut j = i + 1;
-                let mut pushed = false;
-                let mut k = Vec::new();
-                while j < tokens.len() {
-                    match tokens[j] {
-                        Token::Bit(val) => {
-                            k.push(val);
-                        }
-                        Token::RKet(_) => {
-                            res.push(ket(k));
-                            pushed = true;
-                            break;
+                if i < tokens.len() - 2 {
+                    match (&tokens[i + 1], &tokens[i + 2]) {
+                        (Token::Bit(b), Token::RKet(_)) => {
+                            res.push(ket(*b));
+                            i += 3;
+                            continue;
                         }
                         _ => return Err(ParseError::UnclosedKet(*pos)),
                     }
-                    j += 1;
                 }
-
-                if !pushed {
-                    return Err(ParseError::UnclosedKet(*pos));
-                }
-                i = j;
+                return Err(ParseError::UnclosedKet(*pos));
             }
             Token::RKet(pos) => return Err(ParseError::UnopenedKet(*pos)),
             Token::Bit(b) => res.push(bit(*b)),
