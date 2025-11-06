@@ -187,7 +187,7 @@ fn apply_gate(g: &str, k: &Vec<bool>) -> Result<Value, EvalError> {
                     Complex::new(1.0, 0.0),
                 )]))),
                 true => Ok(Value::Superpos(Superpos(vec![(
-                    Term::Const(Const::Ket(vec![false])),
+                    Term::Const(Const::Ket(vec![true])),
                     phase,
                 )]))),
             }
