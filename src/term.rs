@@ -114,100 +114,107 @@ fn subst(t: &Term, x: &str, s: &Term) -> Term {
 }
 
 // Performs a classical beta reduction of two terms
-fn beta_reduce(t1: Term, t2: Term) -> Term {
+fn beta_reduce(t1: Term, t2: Term) -> Result<Term, EvalError> {
     match t1 {
-        Term::Abs(x, body) => subst(&body, &x, &t2),
-        _ => panic!("LHS of beta reduction wasn't a lambda abstraction"),
+        Term::Abs(x, body) => Ok(subst(&body, &x, &t2)),
+        _ => Err(EvalError::BadApplication(
+            "LHS of beta reduction wasn't a lambda abstraction".into(),
+        )),
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum EvalError {
+    BadApplication(String),
+}
+
 // Applies the given quantum gate to the ket
-fn apply_gate(g: &str, k: &Vec<bool>) -> Value {
+fn apply_gate(g: &str, k: &Vec<bool>) -> Result<Value, EvalError> {
     match g {
         "H" => {
             assert!(k.len() == 1);
             let s: f64 = f64::sqrt(0.5);
             match k[0] {
-                false => Value::Superpos(Superpos(vec![
+                false => Ok(Value::Superpos(Superpos(vec![
                     (Term::Const(Const::Ket(vec![false])), Complex::new(s, 0.0)),
                     (Term::Const(Const::Ket(vec![true])), Complex::new(s, 0.0)),
-                ])),
-                true => Value::Superpos(Superpos(vec![
+                ]))),
+                true => Ok(Value::Superpos(Superpos(vec![
                     (Term::Const(Const::Ket(vec![false])), Complex::new(s, 0.0)),
                     (Term::Const(Const::Ket(vec![true])), Complex::new(-s, 0.0)),
-                ])),
+                ]))),
             }
         }
         "C" => {
             assert!(k.len() == 2);
             match (k[0], k[1]) {
-                (false, false) => Value::Superpos(Superpos(vec![(
+                (false, false) => Ok(Value::Superpos(Superpos(vec![(
                     Term::Const(Const::Ket(vec![false, false])),
                     Complex::new(1.0, 0.0),
-                )])),
-                (false, true) => Value::Superpos(Superpos(vec![(
+                )]))),
+                (false, true) => Ok(Value::Superpos(Superpos(vec![(
                     Term::Const(Const::Ket(vec![false, true])),
                     Complex::new(1.0, 0.0),
-                )])),
-                (true, false) => Value::Superpos(Superpos(vec![(
+                )]))),
+                (true, false) => Ok(Value::Superpos(Superpos(vec![(
                     Term::Const(Const::Ket(vec![true, true])),
                     Complex::new(1.0, 0.0),
-                )])),
-                (true, true) => Value::Superpos(Superpos(vec![(
+                )]))),
+                (true, true) => Ok(Value::Superpos(Superpos(vec![(
                     Term::Const(Const::Ket(vec![true, false])),
                     Complex::new(1.0, 0.0),
-                )])),
+                )]))),
             }
         }
         "T" => {
             assert!(k.len() == 1);
             let phase = Complex::new(0.0, PI / 4.0).exp();
             match k[0] {
-                false => Value::Superpos(Superpos(vec![(
+                false => Ok(Value::Superpos(Superpos(vec![(
                     Term::Const(Const::Ket(vec![false])),
                     Complex::new(1.0, 0.0),
-                )])),
-                true => Value::Superpos(Superpos(vec![(
+                )]))),
+                true => Ok(Value::Superpos(Superpos(vec![(
                     Term::Const(Const::Ket(vec![false])),
                     phase,
-                )])),
+                )]))),
             }
         }
-        _ => panic!("Undefined gate"),
+        _ => Err(EvalError::BadApplication(format!("Gate not found: {}", g))),
     }
 }
 
-fn apply(v1: Value, v2: Value) -> Value {
+fn apply(v1: Value, v2: Value) -> Result<Value, EvalError> {
     let res = match (v1, v2) {
         (Value::Term(Term::Const(Const::Gate(g))), Value::Term(Term::Const(Const::Ket(k)))) => {
-            apply_gate(&g, &k)
+            apply_gate(&g, &k)?
         }
-        (Value::Term(t1), Value::Term(t2)) => Value::Term(beta_reduce(t1, t2)),
+        (Value::Term(t1), Value::Term(t2)) => Value::Term(beta_reduce(t1, t2)?),
         (Value::Term(t), Value::Superpos(s)) => {
-            Value::Superpos(s.map_terms(|t2| apply(Value::Term(t.clone()), Value::Term(t2))))
+            Value::Superpos(s.map_terms(|t2| apply(Value::Term(t.clone()), Value::Term(t2)))?)
         }
         (Value::Superpos(s), Value::Term(t)) => {
-            Value::Superpos(s.map_terms(|t2| apply(Value::Term(t2), Value::Term(t.clone()))))
+            Value::Superpos(s.map_terms(|t2| apply(Value::Term(t2), Value::Term(t.clone())))?)
         }
         (Value::Superpos(s1), Value::Superpos(s2)) => {
-            Value::Superpos(s1.zip_terms(&s2, |t1, t2| apply(Value::Term(t1), Value::Term(t2))))
+            Value::Superpos(s1.zip_terms(&s2, |t1, t2| apply(Value::Term(t1), Value::Term(t2)))?)
         }
     };
     match res {
         Value::Term(t) => eval(t),
         Value::Superpos(mut s) => {
             s.merge();
-            Value::Superpos(s)
+            Ok(Value::Superpos(s))
         }
     }
 }
 
-pub fn eval(term: Term) -> Value {
+pub fn eval(term: Term) -> Result<Value, EvalError> {
     match term {
-        Term::Const(_) | Term::Var(_) | Term::Abs(_, _) => Value::Term(term),
+        Term::Const(_) | Term::Var(_) | Term::Abs(_, _) => Ok(Value::Term(term)),
         Term::App(t1, t2) => {
-            let v1 = eval(*t1);
-            let v2 = eval(*t2);
+            let v1 = eval(*t1)?;
+            let v2 = eval(*t2)?;
             apply(v1, v2)
         }
     }

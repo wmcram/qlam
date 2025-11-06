@@ -33,7 +33,10 @@ fn repl_line(line: &str, env: &mut Env) {
         }
     } else {
         match parse(&mut line.chars()) {
-            Ok(t) => println!("{}", eval(t)),
+            Ok(t) => match eval(t) {
+                Ok(v) => println!("{v}"),
+                Err(e) => println!("{:?}", e),
+            },
             Err(e) => println!("{:?}", e),
         }
     }

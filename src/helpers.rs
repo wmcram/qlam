@@ -1,4 +1,9 @@
-use crate::term::{Const, Term};
+use num::Complex;
+
+use crate::{
+    superpos::Superpos,
+    term::{Const, Term, Value},
+};
 
 // Convenience function for constructing variable terms.
 pub fn var(name: &str) -> Term {
@@ -18,6 +23,11 @@ pub fn app(a: Term, b: Term) -> Term {
 // Convenience function for constructing gates.
 pub fn gate(g: &str) -> Term {
     Term::Const(Const::Gate(g.to_string()))
+}
+
+// Convenience function for constructing superpositions.
+pub fn superpos(v: Vec<(Term, Complex<f64>)>) -> Value {
+    Value::Superpos(Superpos(v))
 }
 
 // Convenience function for constructing kets.

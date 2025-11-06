@@ -1,4 +1,4 @@
-use crate::term::{Term, Value};
+use crate::term::{EvalError, Term, Value};
 use num_complex::Complex;
 use rand::Rng;
 
@@ -27,13 +27,13 @@ impl Superpos {
 
     // Maps the function over the branches of the superposition, flattening any newly-generated
     // superpositions into the toplevel one.
-    pub fn map_terms<F>(&self, f: F) -> Self
+    pub fn map_terms<F>(&self, f: F) -> Result<Self, EvalError>
     where
-        F: Fn(Term) -> Value,
+        F: Fn(Term) -> Result<Value, EvalError>,
     {
         let mut out = Vec::new();
         for (t, amp) in &self.0 {
-            match f(t.clone()) {
+            match f(t.clone())? {
                 Value::Term(t2) => out.push((t2, *amp)),
                 // When we flatten here we need to multiply to get the joint probability
                 Value::Superpos(s) => {
@@ -43,19 +43,19 @@ impl Superpos {
                 }
             }
         }
-        Self(out)
+        Ok(Self(out))
     }
 
     // Maps the binary function over both superpositions, taking their branchwise product and
     // flattening as in map_terms.
-    pub fn zip_terms<F>(&self, other: &Superpos, f: F) -> Self
+    pub fn zip_terms<F>(&self, other: &Superpos, f: F) -> Result<Self, EvalError>
     where
-        F: Fn(Term, Term) -> Value,
+        F: Fn(Term, Term) -> Result<Value, EvalError>,
     {
         let mut out = Vec::new();
         for (t1, amp1) in &self.0 {
             for (t2, amp2) in &other.0 {
-                match f(t1.clone(), t2.clone()) {
+                match f(t1.clone(), t2.clone())? {
                     Value::Term(t3) => out.push((t3, amp1 * amp2)),
                     Value::Superpos(s) => {
                         for (u, amp3) in &s.0 {
@@ -66,7 +66,7 @@ impl Superpos {
             }
         }
 
-        Self(out)
+        Ok(Self(out))
     }
 
     // Samples a term from the quantum superposition, consuming this state.
