@@ -19,6 +19,7 @@ impl Display for Value {
 }
 
 // The possible syntactic forms for terms in the AST.
+// TODO: Add pairs?
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Term {
     Var(String),

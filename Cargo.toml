@@ -7,3 +7,5 @@ edition = "2024"
 rand = "0.8"
 num-complex = "0.4"
 num = "0.4.3"
+rustyline = "14"
+

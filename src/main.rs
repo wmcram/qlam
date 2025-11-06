@@ -5,9 +5,11 @@ pub mod repl;
 pub mod superpos;
 pub mod term;
 
+use rustyline::Result;
+
 use crate::repl::repl;
 
-fn main() {
-    println!("Welcome to qlam. Type Ctrl-C to exit.");
-    repl();
+fn main() -> Result<()> {
+    println!("Welcome to qlam. Type Ctrl-D to exit.");
+    repl()
 }

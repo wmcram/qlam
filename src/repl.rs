@@ -2,7 +2,8 @@ use crate::{
     parser::parse,
     term::{Term, eval},
 };
-use std::{collections::HashMap, io::Write};
+use rustyline::{DefaultEditor, Result, error::ReadlineError};
+use std::collections::HashMap;
 
 // A symbol -> term mapping for the REPL environment.
 pub struct Env(HashMap<String, Term>);
@@ -38,21 +39,22 @@ fn repl_line(line: &str, env: &mut Env) {
     }
 }
 
-// Prints the terminal prompt for the REPL.
-fn print_prompt() {
-    print!("qlam> ");
-    std::io::stdout().flush().unwrap();
-}
-
 // Runs the REPL.
-pub fn repl() {
+pub fn repl() -> Result<()> {
+    let mut rl = DefaultEditor::new()?;
+
     let mut env = Env::new();
-    let mut buf = String::new();
-    print_prompt();
-    let stdin = std::io::stdin();
-    while let Ok(_) = stdin.read_line(&mut buf) {
-        repl_line(&mut buf, &mut env);
-        buf = String::new();
-        print_prompt();
+    loop {
+        match rl.readline("qlam> ") {
+            Ok(line) => {
+                rl.add_history_entry(line.as_str())?;
+                repl_line(&line, &mut env);
+            }
+            Err(ReadlineError::Eof) | Err(ReadlineError::Interrupted) => {
+                break;
+            }
+            Err(e) => return Err(e.into()),
+        }
     }
+    Ok(())
 }
