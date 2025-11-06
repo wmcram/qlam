@@ -39,3 +39,8 @@ pub fn ket(k: Vec<bool>) -> Term {
 pub fn bit(b: bool) -> Term {
     Term::Const(Const::Bit(b))
 }
+
+// Convenience function for constructing measurements.
+pub fn meas() -> Term {
+    Term::Const(Const::Meas)
+}

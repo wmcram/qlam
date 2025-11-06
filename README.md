@@ -5,7 +5,6 @@ QLAM (pronounced like "clam") is an interpreter for a language based on van Tond
 QLAM provides as primitives quantum kets such as |0>, |1>, or |010100>, and the [universal gate set](https://en.wikipedia.org/wiki/Quantum_logic_gate#Universal_quantum_gates) {CNOT, H, T}. Everything else happens with regular beta-reduction, although we need to branch whenever one part of a function application is in superposition.
 
 Currently, QLAM can evaluate ASTs defined in source code. Here are some things that are planned for the future:
-- A command-line REPL
 - Visualization of reduction steps
 - Test bench for common quantum algorithms
 - [Superoptimization](https://en.wikipedia.org/wiki/Superoptimization) of small lambda terms

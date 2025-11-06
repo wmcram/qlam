@@ -1,10 +1,11 @@
 use std::str::Chars;
 
 use crate::{
-    helpers::{abs, app, bit, gate, ket, var},
+    helpers::{abs, app, bit, gate, ket, meas, var},
     term::Term,
 };
 
+#[derive(Debug, Clone)]
 enum Token {
     LPar(usize),
     RPar(usize),
@@ -14,6 +15,7 @@ enum Token {
     Lam(usize),
     Gate(String),
     Var(String),
+    Meas,
 }
 
 fn tokenize(input: &mut Chars) -> Vec<Token> {
@@ -36,6 +38,7 @@ fn tokenize(input: &mut Chars) -> Vec<Token> {
             'H' => next_token = Some(Token::Gate("H".into())),
             'C' => next_token = Some(Token::Gate("C".into())),
             'T' => next_token = Some(Token::Gate("T".into())),
+            'M' => next_token = Some(Token::Meas),
             _ => {
                 cur.push(c);
                 continue;
@@ -52,6 +55,11 @@ fn tokenize(input: &mut Chars) -> Vec<Token> {
             None => (),
         }
     }
+
+    if cur.len() > 0 {
+        res.push(Token::Var(cur));
+    }
+
     res
 }
 
@@ -145,12 +153,20 @@ fn parse_tokens(tokens: &[Token]) -> Result<Term, ParseError> {
             Token::Gate(g) => {
                 res.push(gate(g));
             }
+            Token::Meas => {
+                res.push(meas());
+            }
         }
         i += 1;
     }
-    match res.into_iter().reduce(|acc, item| app(acc, item)) {
-        Some(res) => Ok(res),
-        None => Err(ParseError::EmptyList),
+
+    if res.len() == 1 {
+        Ok(res.into_iter().nth(0).unwrap())
+    } else {
+        match res.into_iter().reduce(|acc, item| app(acc, item)) {
+            Some(res) => Ok(res),
+            None => Err(ParseError::EmptyList),
+        }
     }
 }
 

@@ -1,6 +1,6 @@
 use num::Complex;
 
-use crate::superpos::Superpos;
+use crate::{repl::Env, superpos::Superpos};
 use std::{collections::HashSet, f64::consts::PI, fmt::Display, iter::empty};
 
 #[derive(Clone, Debug)]
@@ -44,6 +44,9 @@ impl std::fmt::Display for Term {
                 }
                 write!(f, ">")
             }
+            Term::Const(Const::Meas) => {
+                write!(f, "M")
+            }
             Term::Const(Const::Bit(b)) => {
                 if *b {
                     write!(f, "1")
@@ -62,6 +65,7 @@ pub enum Const {
     Ket(Vec<bool>),
     Bit(bool),
     Gate(String),
+    Meas,
 }
 
 // Gets the free variables of a lambda term.
@@ -126,13 +130,17 @@ fn beta_reduce(t1: Term, t2: Term) -> Result<Term, EvalError> {
 #[derive(Debug, Clone)]
 pub enum EvalError {
     BadApplication(String),
+    GateDim(String),
+    UndefinedSymbol(String),
 }
 
 // Applies the given quantum gate to the ket
 fn apply_gate(g: &str, k: &Vec<bool>) -> Result<Value, EvalError> {
     match g {
         "H" => {
-            assert!(k.len() == 1);
+            if k.len() != 1 {
+                return Err(EvalError::GateDim("Hadamard gate must take 1 qubit".into()));
+            }
             let s: f64 = f64::sqrt(0.5);
             match k[0] {
                 false => Ok(Value::Superpos(Superpos(vec![
@@ -146,7 +154,9 @@ fn apply_gate(g: &str, k: &Vec<bool>) -> Result<Value, EvalError> {
             }
         }
         "C" => {
-            assert!(k.len() == 2);
+            if k.len() != 2 {
+                return Err(EvalError::GateDim("CNOT gate must take 2 qubits".into()));
+            }
             match (k[0], k[1]) {
                 (false, false) => Ok(Value::Superpos(Superpos(vec![(
                     Term::Const(Const::Ket(vec![false, false])),
@@ -167,7 +177,9 @@ fn apply_gate(g: &str, k: &Vec<bool>) -> Result<Value, EvalError> {
             }
         }
         "T" => {
-            assert!(k.len() == 1);
+            if k.len() != 1 {
+                return Err(EvalError::GateDim("T gate must take 1 qubit".into()));
+            }
             let phase = Complex::new(0.0, PI / 4.0).exp();
             match k[0] {
                 false => Ok(Value::Superpos(Superpos(vec![(
@@ -185,37 +197,48 @@ fn apply_gate(g: &str, k: &Vec<bool>) -> Result<Value, EvalError> {
 }
 
 fn apply(v1: Value, v2: Value) -> Result<Value, EvalError> {
-    let res = match (v1, v2) {
+    match (v1, v2) {
         (Value::Term(Term::Const(Const::Gate(g))), Value::Term(Term::Const(Const::Ket(k)))) => {
-            apply_gate(&g, &k)?
+            apply_gate(&g, &k)
         }
-        (Value::Term(t1), Value::Term(t2)) => Value::Term(beta_reduce(t1, t2)?),
+        (Value::Term(Term::Const(Const::Meas)), Value::Superpos(s)) => Ok(Value::Term(s.measure())),
+        (Value::Term(t1), Value::Term(t2)) => Ok(Value::Term(beta_reduce(t1, t2)?)),
         (Value::Term(t), Value::Superpos(s)) => {
-            Value::Superpos(s.map_terms(|t2| apply(Value::Term(t.clone()), Value::Term(t2)))?)
+            Ok(Value::Superpos(s.map_terms(|t2| {
+                apply(Value::Term(t.clone()), Value::Term(t2))
+            })?))
         }
         (Value::Superpos(s), Value::Term(t)) => {
-            Value::Superpos(s.map_terms(|t2| apply(Value::Term(t2), Value::Term(t.clone())))?)
+            Ok(Value::Superpos(s.map_terms(|t2| {
+                apply(Value::Term(t2), Value::Term(t.clone()))
+            })?))
         }
         (Value::Superpos(s1), Value::Superpos(s2)) => {
-            Value::Superpos(s1.zip_terms(&s2, |t1, t2| apply(Value::Term(t1), Value::Term(t2)))?)
-        }
-    };
-    match res {
-        Value::Term(t) => eval(t),
-        Value::Superpos(mut s) => {
-            s.merge();
-            Ok(Value::Superpos(s))
+            Ok(Value::Superpos(s1.zip_terms(&s2, |t1, t2| {
+                apply(Value::Term(t1), Value::Term(t2))
+            })?))
         }
     }
 }
 
-pub fn eval(term: Term) -> Result<Value, EvalError> {
+pub fn eval(term: Term, env: &Env) -> Result<Value, EvalError> {
     match term {
-        Term::Const(_) | Term::Var(_) | Term::Abs(_, _) => Ok(Value::Term(term)),
+        Term::Const(_) | Term::Abs(_, _) => Ok(Value::Term(term)),
+        Term::Var(ref x) => match env.get(&x) {
+            Some(v) => Ok(v),
+            None => Err(EvalError::UndefinedSymbol(x.into())),
+        },
         Term::App(t1, t2) => {
-            let v1 = eval(*t1)?;
-            let v2 = eval(*t2)?;
-            apply(v1, v2)
+            let v1 = eval(*t1, env)?;
+            let v2 = eval(*t2, env)?;
+            let res = apply(v1, v2)?;
+            match res {
+                Value::Term(t) => eval(t, env),
+                Value::Superpos(mut s) => {
+                    s.merge();
+                    Ok(Value::Superpos(s))
+                }
+            }
         }
     }
 }
