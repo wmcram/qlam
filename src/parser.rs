@@ -1,22 +1,22 @@
 use std::str::Chars;
 
 use crate::{
-    helpers::{abs, app, gate, ket, var},
+    helpers::{abs, app, bit, gate, ket, var},
     term::Term,
 };
 
-pub enum Token {
+enum Token {
     LPar(usize),
     RPar(usize),
     LKet(usize),
     RKet(usize),
-    Qubit(usize, bool),
+    Bit(bool),
     Lam(usize),
-    Gate(usize, String),
-    Var(usize, String),
+    Gate(String),
+    Var(String),
 }
 
-pub fn tokenize(input: &mut Chars) -> Vec<Token> {
+fn tokenize(input: &mut Chars) -> Vec<Token> {
     let mut res = Vec::new();
     let mut cur = String::new();
     let mut pos = 0;
@@ -31,11 +31,11 @@ pub fn tokenize(input: &mut Chars) -> Vec<Token> {
             ')' => next_token = Some(Token::RPar(pos)),
             '|' => next_token = Some(Token::LKet(pos)),
             '>' => next_token = Some(Token::RKet(pos)),
-            '0' => next_token = Some(Token::Qubit(pos, false)),
-            '1' => next_token = Some(Token::Qubit(pos, true)),
-            'H' => next_token = Some(Token::Gate(pos, "H".into())),
-            'C' => next_token = Some(Token::Gate(pos, "C".into())),
-            'T' => next_token = Some(Token::Gate(pos, "T".into())),
+            '0' => next_token = Some(Token::Bit(false)),
+            '1' => next_token = Some(Token::Bit(true)),
+            'H' => next_token = Some(Token::Gate("H".into())),
+            'C' => next_token = Some(Token::Gate("C".into())),
+            'T' => next_token = Some(Token::Gate("T".into())),
             _ => {
                 cur.push(c);
                 continue;
@@ -43,7 +43,7 @@ pub fn tokenize(input: &mut Chars) -> Vec<Token> {
         }
 
         if cur.len() > 0 {
-            res.push(Token::Var(pos, cur));
+            res.push(Token::Var(cur));
             cur = String::new();
         }
 
@@ -107,7 +107,7 @@ fn parse_tokens(tokens: &[Token]) -> Result<Term, ParseError> {
                 let mut k = Vec::new();
                 while j < tokens.len() {
                     match tokens[j] {
-                        Token::Qubit(_, val) => {
+                        Token::Bit(val) => {
                             k.push(val);
                         }
                         Token::RKet(_) => {
@@ -126,12 +126,12 @@ fn parse_tokens(tokens: &[Token]) -> Result<Term, ParseError> {
                 i = j;
             }
             Token::RKet(pos) => return Err(ParseError::UnopenedKet(*pos)),
-            Token::Qubit(pos, _) => return Err(ParseError::LoneQubit(*pos)),
+            Token::Bit(b) => res.push(bit(*b)),
             Token::Lam(pos) => {
                 if tokens.len() <= i + 2 {
                     return Err(ParseError::MissingBody(*pos));
                 }
-                if let Some(Token::Var(_, x)) = tokens.get(i + 1) {
+                if let Some(Token::Var(x)) = tokens.get(i + 1) {
                     let rest = parse_tokens(&tokens[i + 2..])?;
                     res.push(abs(x, rest));
                     i = tokens.len();
@@ -139,10 +139,10 @@ fn parse_tokens(tokens: &[Token]) -> Result<Term, ParseError> {
                     return Err(ParseError::MissingVar(*pos));
                 }
             }
-            Token::Var(_, x) => {
+            Token::Var(x) => {
                 res.push(var(x));
             }
-            Token::Gate(_, g) => {
+            Token::Gate(g) => {
                 res.push(gate(g));
             }
         }

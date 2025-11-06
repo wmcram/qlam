@@ -44,6 +44,13 @@ impl std::fmt::Display for Term {
                 }
                 write!(f, ">")
             }
+            Term::Const(Const::Bit(b)) => {
+                if *b {
+                    write!(f, "1")
+                } else {
+                    write!(f, "0")
+                }
+            }
             Term::Abs(x, body) => write!(f, "(λ{x}. {body})"),
             Term::App(a, b) => write!(f, "({a} {b})"),
         }
@@ -53,6 +60,7 @@ impl std::fmt::Display for Term {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Const {
     Ket(Vec<bool>),
+    Bit(bool),
     Gate(String),
 }
 

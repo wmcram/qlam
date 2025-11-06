@@ -24,3 +24,8 @@ pub fn gate(g: &str) -> Term {
 pub fn ket(k: Vec<bool>) -> Term {
     Term::Const(Const::Ket(k))
 }
+
+// Convenience function for constructing bits.
+pub fn bit(b: bool) -> Term {
+    Term::Const(Const::Bit(b))
+}
