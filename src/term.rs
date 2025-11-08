@@ -2,10 +2,14 @@ use num::Complex;
 
 use crate::{
     helpers::{ket, pair},
-    repl::Env,
     superpos::Superpos,
 };
-use std::{collections::HashSet, f64::consts::PI, fmt::Display, iter::empty};
+use std::{
+    collections::{HashMap, HashSet},
+    f64::consts::PI,
+    fmt::Display,
+    iter::empty,
+};
 
 #[derive(Clone, Debug)]
 pub enum Value {
@@ -268,11 +272,11 @@ fn apply(v1: Value, v2: Value) -> Result<Value, EvalError> {
     }
 }
 
-pub fn eval(term: Term, env: &Env) -> Result<Value, EvalError> {
+pub fn eval(term: Term, env: &mut HashMap<String, Value>) -> Result<Value, EvalError> {
     match term {
         Term::Const(_) | Term::Abs(_, _) => Ok(Value::Term(term)),
-        Term::Var(ref x) => match env.get(&x) {
-            Some(v) => Ok(v),
+        Term::Var(ref x) => match env.get(x) {
+            Some(v) => Ok(v.clone()),
             None => Err(EvalError::UndefinedSymbol(x.into())),
         },
         Term::App(t1, t2) => {
