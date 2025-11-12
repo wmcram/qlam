@@ -81,7 +81,7 @@ impl Superpos {
         for (i, p) in probs.iter().enumerate() {
             res += p;
             if res >= r {
-                return self.0.into_iter().nth(i).unwrap().0;
+                return self.0.into_iter().nth(i).unwrap().0.to_classical();
             }
         }
         self.0

@@ -1,7 +1,7 @@
 use num::Complex;
 
 use crate::{
-    helpers::{ket, pair, superpos},
+    helpers::{abs, app, bit, ket, pair, superpos},
     superpos::Superpos,
 };
 use std::{
@@ -71,6 +71,15 @@ impl Term {
             }
         }
         None
+    }
+
+    pub fn to_classical(self) -> Term {
+        match self {
+            Term::Const(Const::Ket(b)) => bit(b),
+            Term::Const(_) | Term::Var(_) => self,
+            Term::Abs(x, body) => abs(&x, body.to_classical()),
+            Term::App(t1, t2) => app(t1.to_classical(), t2.to_classical()),
+        }
     }
 }
 
