@@ -11,7 +11,7 @@ pub struct Repl {
 }
 
 impl Repl {
-    // Creates a new Repl with a blank env.
+    // Creates a new Repl with an empty environment.
     pub fn new() -> Self {
         Self {
             env: HashMap::new(),
@@ -28,12 +28,14 @@ impl Repl {
         self.env.get(name).cloned()
     }
 
+    // Prints the (name,term) pairs in the environment to console.
     fn print_env(&self) {
         for (k, v) in &self.env {
             println!("{}: {}", k, v);
         }
     }
 
+    // Resets the environment back to empty.
     fn reset_env(&mut self) {
         self.env.clear();
     }

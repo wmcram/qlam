@@ -1,7 +1,7 @@
 use num::Complex;
 
 use crate::{
-    helpers::{ket, pair},
+    helpers::{ket, pair, superpos},
     superpos::Superpos,
 };
 use std::{
@@ -227,19 +227,14 @@ fn apply_gate(g: &str, t: &Term) -> Result<Value, EvalError> {
     match g {
         "H" => {
             if let Term::Const(Const::Ket(b)) = t {
-                let s: f64 = f64::sqrt(0.5);
-                return match b {
-                    false => Ok(Value::Superpos(Superpos(vec![
-                        (Term::Const(Const::Ket(false)), Complex::new(s, 0.0)),
-                        (Term::Const(Const::Ket(true)), Complex::new(s, 0.0)),
-                    ]))),
-                    true => Ok(Value::Superpos(Superpos(vec![
-                        (Term::Const(Const::Ket(false)), Complex::new(s, 0.0)),
-                        (Term::Const(Const::Ket(true)), Complex::new(-s, 0.0)),
-                    ]))),
-                };
+                let s = f64::sqrt(0.5);
+                let vec = vec![
+                    (ket(false), Complex::new(s, 0.0)),
+                    (ket(true), Complex::new(if *b { -s } else { s }, 0.0)),
+                ];
+                Ok(superpos(vec))
             } else {
-                return Err(EvalError::BadGate("Hadamard gate must take 1 qubit".into()));
+                Err(EvalError::BadGate("Hadamard gate must take 1 qubit".into()))
             }
         }
         "C" => {
@@ -250,43 +245,24 @@ fn apply_gate(g: &str, t: &Term) -> Result<Value, EvalError> {
                 let Term::Const(Const::Ket(b2)) = b else {
                     return Err(EvalError::BadGate("CNOT must take a pair of qubits".into()));
                 };
-                return match (b1, b2) {
-                    (false, false) => Ok(Value::Superpos(Superpos(vec![(
-                        pair(ket(false), ket(false)),
-                        Complex::new(1.0, 0.0),
-                    )]))),
-                    (false, true) => Ok(Value::Superpos(Superpos(vec![(
-                        pair(ket(false), ket(true)),
-                        Complex::new(1.0, 0.0),
-                    )]))),
-                    (true, false) => Ok(Value::Superpos(Superpos(vec![(
-                        pair(ket(true), ket(true)),
-                        Complex::new(1.0, 0.0),
-                    )]))),
-                    (true, true) => Ok(Value::Superpos(Superpos(vec![(
-                        pair(ket(true), ket(false)),
-                        Complex::new(1.0, 0.0),
-                    )]))),
+                let out = match (b1, b2) {
+                    (false, false) => pair(ket(false), ket(false)),
+                    (false, true) => pair(ket(false), ket(true)),
+                    (true, false) => pair(ket(true), ket(true)),
+                    (true, true) => pair(ket(true), ket(false)),
                 };
+                Ok(superpos(vec![(out, Complex::new(1.0, 0.0))]))
             } else {
-                return Err(EvalError::BadGate("CNOT must take a pair of qubits".into()));
+                Err(EvalError::BadGate("CNOT must take a pair of qubits".into()))
             }
         }
         "T" => {
             if let Term::Const(Const::Ket(b)) = t {
                 let phase = Complex::new(0.0, PI / 4.0).exp();
-                match b {
-                    false => Ok(Value::Superpos(Superpos(vec![(
-                        Term::Const(Const::Ket(false)),
-                        Complex::new(1.0, 0.0),
-                    )]))),
-                    true => Ok(Value::Superpos(Superpos(vec![(
-                        Term::Const(Const::Ket(true)),
-                        phase,
-                    )]))),
-                }
+                let vec = vec![(ket(*b), if *b { phase } else { Complex::new(1.0, 0.0) })];
+                Ok(superpos(vec))
             } else {
-                return Err(EvalError::BadGate("T gate must take 1 qubit".into()));
+                Err(EvalError::BadGate("T gate must take 1 qubit".into()))
             }
         }
         _ => Err(EvalError::BadApplication(format!("Gate not found: {}", g))),
