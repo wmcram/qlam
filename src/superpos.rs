@@ -81,7 +81,8 @@ impl Superpos {
         for (i, p) in probs.iter().enumerate() {
             res += p;
             if res >= r {
-                return self.0.into_iter().nth(i).unwrap().0.to_classical();
+                // TODO: determine how to make classical
+                return self.0.into_iter().nth(i).unwrap().0;
             }
         }
         self.0

@@ -241,7 +241,7 @@ fn apply_gate(g: &str, t: &Term) -> Result<Value, EvalError> {
                 ];
                 Ok(superpos(vec))
             } else {
-                Err(EvalError::BadGate("Hadamard gate must take 1 qubit".into()))
+                Err(EvalError::BadGate(format!("Hadamard failure: {}", t)))
             }
         }
         "C" => {
