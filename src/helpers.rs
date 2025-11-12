@@ -35,11 +35,6 @@ pub fn ket(k: bool) -> Term {
     Term::Const(Const::Ket(k))
 }
 
-// Convenience function for constructing bits.
-pub fn bit(b: bool) -> Term {
-    Term::Const(Const::Bit(b))
-}
-
 // Convenience function for constructing measurements.
 pub fn meas() -> Term {
     Term::Const(Const::Meas)

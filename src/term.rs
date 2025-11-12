@@ -1,7 +1,7 @@
 use num::Complex;
 
 use crate::{
-    helpers::{abs, app, bit, ket, pair, superpos},
+    helpers::{abs, app, ket, pair, superpos, var},
     superpos::Superpos,
 };
 use std::{
@@ -75,7 +75,13 @@ impl Term {
 
     pub fn to_classical(self) -> Term {
         match self {
-            Term::Const(Const::Ket(b)) => bit(b),
+            Term::Const(Const::Ket(b)) => {
+                if b {
+                    var("true")
+                } else {
+                    var("false")
+                }
+            }
             Term::Const(_) | Term::Var(_) => self,
             Term::Abs(x, body) => abs(&x, body.to_classical()),
             Term::App(t1, t2) => app(t1.to_classical(), t2.to_classical()),
@@ -100,13 +106,6 @@ impl std::fmt::Display for Term {
             Term::Const(Const::Meas) => {
                 write!(f, "M")
             }
-            Term::Const(Const::Bit(b)) => {
-                if *b {
-                    write!(f, "1")
-                } else {
-                    write!(f, "0")
-                }
-            }
             Term::Abs(x, body) => write!(f, "(λ{x}. {body})"),
             Term::App(a, b) => write!(f, "({a} {b})"),
         }
@@ -116,7 +115,6 @@ impl std::fmt::Display for Term {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Const {
     Ket(bool),
-    Bit(bool),
     Gate(String),
     Meas,
 }

@@ -4,6 +4,7 @@ use crate::repl::Repl;
 pub fn load_stdlib(repl: &mut Repl) {
     repl.read_line("true = \\x.\\y.x");
     repl.read_line("false = \\x.\\y.y");
+    repl.read_line("if = \\b.\\x.\\y.b x y");
     repl.read_line("cons = \\x.\\y.\\b.b x y");
     repl.read_line("fst = \\p.p true");
     repl.read_line("snd = \\p.p false");

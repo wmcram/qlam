@@ -1,7 +1,7 @@
 use std::str::Chars;
 
 use crate::{
-    helpers::{abs, app, bit, gate, ket, meas, var},
+    helpers::{abs, app, gate, ket, meas, var},
     term::Term,
 };
 
@@ -11,7 +11,7 @@ enum Token {
     RPar(usize),
     LKet(usize),
     RKet(usize),
-    Bit(bool),
+    Bit(usize, bool),
     Lam(usize),
     Gate(String),
     Var(String),
@@ -33,8 +33,8 @@ fn tokenize(input: &mut Chars) -> Vec<Token> {
             ')' => next_token = Some(Token::RPar(pos)),
             '|' => next_token = Some(Token::LKet(pos)),
             '>' => next_token = Some(Token::RKet(pos)),
-            '0' => next_token = Some(Token::Bit(false)),
-            '1' => next_token = Some(Token::Bit(true)),
+            '0' => next_token = Some(Token::Bit(pos, false)),
+            '1' => next_token = Some(Token::Bit(pos, true)),
             'H' => next_token = Some(Token::Gate("H".into())),
             'C' => next_token = Some(Token::Gate("C".into())),
             'T' => next_token = Some(Token::Gate("T".into())),
@@ -112,7 +112,7 @@ fn parse_tokens(tokens: &[Token]) -> Result<Term, ParseError> {
             Token::LKet(pos) => {
                 if i < tokens.len() - 2 {
                     match (&tokens[i + 1], &tokens[i + 2]) {
-                        (Token::Bit(b), Token::RKet(_)) => {
+                        (Token::Bit(_, b), Token::RKet(_)) => {
                             res.push(ket(*b));
                             i += 3;
                             continue;
@@ -123,7 +123,7 @@ fn parse_tokens(tokens: &[Token]) -> Result<Term, ParseError> {
                 return Err(ParseError::UnclosedKet(*pos));
             }
             Token::RKet(pos) => return Err(ParseError::UnopenedKet(*pos)),
-            Token::Bit(b) => res.push(bit(*b)),
+            Token::Bit(pos, _) => return Err(ParseError::LoneQubit(*pos)),
             Token::Lam(pos) => {
                 if tokens.len() <= i + 2 {
                     return Err(ParseError::MissingBody(*pos));
