@@ -15,6 +15,16 @@ pub fn abs(p: &str, body: Term) -> Term {
     Term::Abs(p.to_string(), Box::new(body))
 }
 
+// Convenience function for constructing nonlinear lambda terms.
+pub fn nonlinear_abs(p: &str, body: Term) -> Term {
+    Term::NonlinearAbs(p.to_string(), Box::new(body))
+}
+
+// Convenience function for constructing nonlinear suspensions.
+pub fn nonlinear(t: Term) -> Term {
+    Term::Nonlinear(Box::new(t))
+}
+
 // Convenience function for constructing application terms.
 pub fn app(a: Term, b: Term) -> Term {
     Term::App(Box::new(a), Box::new(b))

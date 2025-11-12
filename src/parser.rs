@@ -1,7 +1,7 @@
 use std::str::Chars;
 
 use crate::{
-    helpers::{abs, app, gate, ket, meas, var},
+    helpers::{abs, app, gate, ket, meas, nonlinear, nonlinear_abs, var},
     term::Term,
 };
 
@@ -13,6 +13,8 @@ enum Token {
     RKet(usize),
     Bit(usize, bool),
     Lam(usize),
+    NonlinearLam(usize),
+    Nonlinear,
     Gate(String),
     Var(String),
     Meas,
@@ -27,8 +29,10 @@ fn tokenize(input: &mut Chars) -> Vec<Token> {
         pos += 1;
         let mut next_token = None;
         match c {
-            '\\' | 'λ' => next_token = Some(Token::Lam(pos)),
             c if c.is_whitespace() || c == '.' => (),
+            '\\' | 'λ' => next_token = Some(Token::Lam(pos)),
+            '#' => next_token = Some(Token::NonlinearLam(pos)),
+            '!' => next_token = Some(Token::Nonlinear),
             '(' => next_token = Some(Token::LPar(pos)),
             ')' => next_token = Some(Token::RPar(pos)),
             '|' => next_token = Some(Token::LKet(pos)),
@@ -69,6 +73,7 @@ pub enum ParseError {
     UnopenedPar(usize),
     UnopenedKet(usize),
     UnclosedKet(usize),
+    UnusedNonlinear,
     LoneQubit(usize),
     MissingVar(usize),
     MissingBody(usize),
@@ -78,8 +83,12 @@ pub enum ParseError {
 fn parse_tokens(tokens: &[Token]) -> Result<Term, ParseError> {
     let mut i = 0;
     let mut res = Vec::new();
+    let mut next_nonlinear = false;
     while i < tokens.len() {
         match &tokens[i] {
+            Token::Nonlinear => {
+                next_nonlinear = true;
+            }
             Token::LPar(pos) => {
                 let mut depth = 0;
                 let mut j = i + 1;
@@ -91,7 +100,11 @@ fn parse_tokens(tokens: &[Token]) -> Result<Term, ParseError> {
                         }
                         Token::RPar(_) => {
                             if depth == 0 {
-                                let inner = parse_tokens(&tokens[i + 1..=j - 1])?;
+                                let mut inner = parse_tokens(&tokens[i + 1..=j - 1])?;
+                                if next_nonlinear {
+                                    inner = nonlinear(inner);
+                                    next_nonlinear = false;
+                                }
                                 res.push(inner);
                                 pushed = true;
                                 break;
@@ -136,6 +149,18 @@ fn parse_tokens(tokens: &[Token]) -> Result<Term, ParseError> {
                     return Err(ParseError::MissingVar(*pos));
                 }
             }
+            Token::NonlinearLam(pos) => {
+                if tokens.len() <= i + 2 {
+                    return Err(ParseError::MissingBody(*pos));
+                }
+                if let Some(Token::Var(x)) = tokens.get(i + 1) {
+                    let rest = parse_tokens(&tokens[i + 2..])?;
+                    res.push(nonlinear_abs(x, rest));
+                    i = tokens.len();
+                } else {
+                    return Err(ParseError::MissingVar(*pos));
+                }
+            }
             Token::Var(x) => {
                 res.push(var(x));
             }
@@ -147,6 +172,10 @@ fn parse_tokens(tokens: &[Token]) -> Result<Term, ParseError> {
             }
         }
         i += 1;
+    }
+
+    if next_nonlinear {
+        return Err(ParseError::UnusedNonlinear);
     }
 
     if res.len() == 1 {

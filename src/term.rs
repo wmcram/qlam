@@ -1,7 +1,7 @@
 use num::Complex;
 
 use crate::{
-    helpers::{abs, app, ket, pair, superpos, var},
+    helpers::{abs, app, ket, nonlinear, nonlinear_abs, pair, superpos, var},
     superpos::Superpos,
 };
 use std::{
@@ -33,6 +33,8 @@ pub enum Term {
     Const(Const),
     Abs(String, Box<Term>),
     App(Box<Term>, Box<Term>),
+    NonlinearAbs(String, Box<Term>),
+    Nonlinear(Box<Term>),
 }
 
 impl Term {
@@ -85,6 +87,8 @@ impl Term {
             Term::Const(_) | Term::Var(_) => self,
             Term::Abs(x, body) => abs(&x, body.to_classical()),
             Term::App(t1, t2) => app(t1.to_classical(), t2.to_classical()),
+            Term::NonlinearAbs(x, body) => nonlinear_abs(&x, body.to_classical()),
+            Term::Nonlinear(t) => nonlinear(t.to_classical()),
         }
     }
 }
@@ -108,6 +112,8 @@ impl std::fmt::Display for Term {
             }
             Term::Abs(x, body) => write!(f, "(λ{x}. {body})"),
             Term::App(a, b) => write!(f, "({a} {b})"),
+            Term::NonlinearAbs(x, body) => write!(f, "(#{x}. {body})"),
+            Term::Nonlinear(t) => write!(f, "!({t})"),
         }
     }
 }
@@ -126,6 +132,8 @@ fn free_vars(t: &Term) -> HashSet<String> {
         Term::Const(_) => empty().collect(),
         Term::Abs(x, body) => &free_vars(body) - &[x.clone()].into_iter().collect(),
         Term::App(a, b) => &free_vars(a) | &free_vars(b),
+        Term::NonlinearAbs(x, body) => &free_vars(body) - &[x.clone()].into_iter().collect(),
+        Term::Nonlinear(t) => free_vars(t),
     }
 }
 
@@ -151,7 +159,7 @@ fn num_occurrences(x: &str, t: &Term) -> u32 {
             }
         }
         Term::Const(_) => 0,
-        Term::Abs(y, body) => {
+        Term::Abs(y, body) | Term::NonlinearAbs(y, body) => {
             if x == y {
                 0
             } else {
@@ -159,22 +167,20 @@ fn num_occurrences(x: &str, t: &Term) -> u32 {
             }
         }
         Term::App(t1, t2) => num_occurrences(x, t1) + num_occurrences(x, t2),
+        Term::Nonlinear(s) => num_occurrences(x, s),
     }
 }
 
 // Safely substitues t[x -> s].
-fn subst(t: &Term, x: &str, s: &Term) -> Result<Term, EvalError> {
+fn subst(t: &Term, x: &str, s: &Term, linear: bool) -> Result<Term, EvalError> {
     // Check for ket substitution, in this case we need to ensure linearity holds
-    match s {
-        Term::Const(Const::Ket(_)) => {
-            if num_occurrences(x, t) != 1 {
-                return Err(EvalError::LinearityViolation(format!(
-                    "substitution of `{}` in `{}`",
-                    x, t
-                )));
-            }
+    if linear {
+        if num_occurrences(x, t) != 1 {
+            return Err(EvalError::LinearityViolation(format!(
+                "substitution of `{}` in `{}`",
+                x, t
+            )));
         }
-        _ => (),
     }
 
     // The recursive procedure for substitution.
@@ -188,7 +194,7 @@ fn subst(t: &Term, x: &str, s: &Term) -> Result<Term, EvalError> {
                 }
             }
             Term::Const(_) => t.clone(),
-            Term::Abs(y, body) => {
+            Term::Abs(y, body) | Term::NonlinearAbs(y, body) => {
                 // shadowed case
                 if y == x {
                     t.clone()
@@ -196,15 +202,13 @@ fn subst(t: &Term, x: &str, s: &Term) -> Result<Term, EvalError> {
                     let used: HashSet<_> = free_vars(body).union(&free_vars(s)).cloned().collect();
                     let fresh = fresh_var(y, &used);
                     let renamed_body = subst_helper(body, y, &Term::Var(fresh.clone()));
-                    Term::Abs(fresh, Box::new(subst_helper(&renamed_body, x, s)))
+                    abs(&fresh, subst_helper(&renamed_body, x, s))
                 } else {
-                    Term::Abs(y.clone(), Box::new(subst_helper(body, x, s)))
+                    abs(&y, subst_helper(body, x, s))
                 }
             }
-            Term::App(a, b) => Term::App(
-                Box::new(subst_helper(a, x, s)),
-                Box::new(subst_helper(b, x, s)),
-            ),
+            Term::App(a, b) => app(subst_helper(a, x, s), subst_helper(b, x, s)),
+            Term::Nonlinear(t2) => nonlinear(subst_helper(t2, x, s)),
         }
     }
 
@@ -213,11 +217,19 @@ fn subst(t: &Term, x: &str, s: &Term) -> Result<Term, EvalError> {
 
 // Performs a classical beta reduction of two terms
 fn beta_reduce(t1: Term, t2: Term) -> Result<Term, EvalError> {
-    match t1 {
-        Term::Abs(x, body) => Ok(subst(&body, &x, &t2)?),
-        _ => Err(EvalError::BadApplication(
-            "LHS of beta reduction wasn't a lambda abstraction".into(),
-        )),
+    match &t1 {
+        Term::Abs(x, body) => Ok(subst(body, x, &t2, true)?),
+        Term::NonlinearAbs(x, body) => match &t2 {
+            Term::Nonlinear(t) => Ok(subst(body, x, t, false)?),
+            _ => Err(EvalError::BadApplication(format!(
+                "Failure to beta-reduce nonlinear application {} {}: RHS was linear",
+                t1, t2
+            ))),
+        },
+        _ => Err(EvalError::BadApplication(format!(
+            "Failure to beta-reduce application {} {}: LHS was not a lambda",
+            t1, t2
+        ))),
     }
 }
 
@@ -301,7 +313,9 @@ fn apply(v1: Value, v2: Value) -> Result<Value, EvalError> {
 
 pub fn eval(term: Term, env: &mut HashMap<String, Value>) -> Result<Value, EvalError> {
     match term {
-        Term::Const(_) | Term::Abs(_, _) => Ok(Value::Term(term)),
+        Term::Const(_) | Term::Abs(_, _) | Term::NonlinearAbs(_, _) | Term::Nonlinear(_) => {
+            Ok(Value::Term(term))
+        }
         Term::Var(ref x) => match env.get(x) {
             Some(v) => Ok(v.clone()),
             None => Err(EvalError::UndefinedSymbol(x.into())),
