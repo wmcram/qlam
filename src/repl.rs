@@ -8,7 +8,6 @@ use std::collections::HashMap;
 
 pub struct Repl {
     env: HashMap<String, Value>,
-    verbose: bool,
 }
 
 impl Repl {
@@ -16,7 +15,6 @@ impl Repl {
     pub fn new() -> Self {
         Self {
             env: HashMap::new(),
-            verbose: false,
         }
     }
 

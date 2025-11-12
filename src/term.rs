@@ -133,38 +133,81 @@ fn fresh_var(base: &str, in_use: &HashSet<String>) -> String {
     name
 }
 
-// Safely substitues t[x -> s].
-fn subst(t: &Term, x: &str, s: &Term) -> Term {
+// Determines the number of occurences of variable x in this term.
+fn num_occurrences(x: &str, t: &Term) -> u32 {
     match t {
         Term::Var(y) => {
             if x == y {
-                s.clone()
+                1
             } else {
-                t.clone()
+                0
             }
         }
-        Term::Const(_) => t.clone(),
+        Term::Const(_) => 0,
         Term::Abs(y, body) => {
-            // shadowed case
-            if y == x {
-                t.clone()
-            } else if free_vars(s).contains(y) {
-                let used: HashSet<_> = free_vars(body).union(&free_vars(s)).cloned().collect();
-                let fresh = fresh_var(y, &used);
-                let renamed_body = subst(body, y, &Term::Var(fresh.clone()));
-                Term::Abs(fresh, Box::new(subst(&renamed_body, x, s)))
+            if x == y {
+                0
             } else {
-                Term::Abs(y.clone(), Box::new(subst(body, x, s)))
+                num_occurrences(x, body)
             }
         }
-        Term::App(a, b) => Term::App(Box::new(subst(a, x, s)), Box::new(subst(b, x, s))),
+        Term::App(t1, t2) => num_occurrences(x, t1) + num_occurrences(x, t2),
     }
+}
+
+// Safely substitues t[x -> s].
+fn subst(t: &Term, x: &str, s: &Term) -> Result<Term, EvalError> {
+    // Check for ket substitution, in this case we need to ensure linearity holds
+    match s {
+        Term::Const(Const::Ket(_)) => {
+            if num_occurrences(x, t) != 1 {
+                return Err(EvalError::LinearityViolation(format!(
+                    "substitution of `{}` in `{}`",
+                    x, t
+                )));
+            }
+        }
+        _ => (),
+    }
+
+    // The recursive procedure for substitution.
+    fn subst_helper(t: &Term, x: &str, s: &Term) -> Term {
+        match t {
+            Term::Var(y) => {
+                if x == y {
+                    s.clone()
+                } else {
+                    t.clone()
+                }
+            }
+            Term::Const(_) => t.clone(),
+            Term::Abs(y, body) => {
+                // shadowed case
+                if y == x {
+                    t.clone()
+                } else if free_vars(s).contains(y) {
+                    let used: HashSet<_> = free_vars(body).union(&free_vars(s)).cloned().collect();
+                    let fresh = fresh_var(y, &used);
+                    let renamed_body = subst_helper(body, y, &Term::Var(fresh.clone()));
+                    Term::Abs(fresh, Box::new(subst_helper(&renamed_body, x, s)))
+                } else {
+                    Term::Abs(y.clone(), Box::new(subst_helper(body, x, s)))
+                }
+            }
+            Term::App(a, b) => Term::App(
+                Box::new(subst_helper(a, x, s)),
+                Box::new(subst_helper(b, x, s)),
+            ),
+        }
+    }
+
+    Ok(subst_helper(t, x, s))
 }
 
 // Performs a classical beta reduction of two terms
 fn beta_reduce(t1: Term, t2: Term) -> Result<Term, EvalError> {
     match t1 {
-        Term::Abs(x, body) => Ok(subst(&body, &x, &t2)),
+        Term::Abs(x, body) => Ok(subst(&body, &x, &t2)?),
         _ => Err(EvalError::BadApplication(
             "LHS of beta reduction wasn't a lambda abstraction".into(),
         )),
@@ -176,6 +219,7 @@ pub enum EvalError {
     BadApplication(String),
     BadGate(String),
     UndefinedSymbol(String),
+    LinearityViolation(String),
 }
 
 // Applies the given quantum gate to the ket
