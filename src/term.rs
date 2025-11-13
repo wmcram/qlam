@@ -176,7 +176,7 @@ fn num_occurrences(x: &str, t: &Term) -> u32 {
 fn well_formed(t: &Term) -> Result<(), String> {
     #[derive(Clone, Copy, Debug)]
     enum VarKind {
-        Linear(usize), // count uses
+        Linear(usize),
         Nonlinear,
     }
 
@@ -193,21 +193,29 @@ fn well_formed(t: &Term) -> Result<(), String> {
             Term::Const(_) => Ok(()),
 
             Term::Abs(x, body) => {
-                // linear binder: must appear exactly once
-                vars.insert(x.clone(), VarKind::Linear(0));
+                // save old binding if shadowed
+                let old = vars.insert(x.clone(), VarKind::Linear(0));
                 check(body, vars)?;
                 match vars.remove(x) {
                     Some(VarKind::Linear(0)) => Err(format!("linear variable {x} unused")),
                     Some(VarKind::Linear(1)) => Ok(()),
                     Some(VarKind::Linear(n)) => Err(format!("linear variable {x} used {n} times")),
                     _ => unreachable!(),
+                }?;
+                // restore old binding
+                if let Some(v) = old {
+                    vars.insert(x.clone(), v);
                 }
+                Ok(())
             }
 
             Term::NonlinearAbs(x, body) => {
-                vars.insert(x.clone(), VarKind::Nonlinear);
+                let old = vars.insert(x.clone(), VarKind::Nonlinear);
                 check(body, vars)?;
                 vars.remove(x);
+                if let Some(v) = old {
+                    vars.insert(x.clone(), v);
+                }
                 Ok(())
             }
 
@@ -217,7 +225,6 @@ fn well_formed(t: &Term) -> Result<(), String> {
             }
 
             Term::Nonlinear(t) => {
-                // inside !t, no linear vars may appear
                 let mut inner = vars.clone();
                 check(t, &mut inner)?;
                 for (x, kind) in inner {
@@ -231,6 +238,7 @@ fn well_formed(t: &Term) -> Result<(), String> {
             }
         }
     }
+
     check(t, &mut HashMap::new())
 }
 
@@ -273,10 +281,7 @@ fn beta_reduce(t1: Term, t2: Term) -> Result<Term, EvalError> {
     match &t1 {
         Term::Abs(x, body) => Ok(subst(body, x, &t2)?),
         Term::NonlinearAbs(x, body) => match &t2 {
-            Term::Nonlinear(t) => {
-                well_formed(t).map_err(|e| EvalError::LinearityViolation(e.into()))?;
-                Ok(subst(body, x, t)?)
-            }
+            Term::Nonlinear(t) => Ok(subst(body, x, t)?),
             _ => Err(EvalError::BadApplication(format!(
                 "Failure to beta-reduce nonlinear application {} {}: RHS was linear",
                 t1, t2
@@ -368,23 +373,32 @@ fn apply(v1: Value, v2: Value) -> Result<Value, EvalError> {
 }
 
 pub fn eval(term: Term) -> Result<Value, EvalError> {
-    match term {
-        Term::Const(_)
-        | Term::Abs(_, _)
-        | Term::NonlinearAbs(_, _)
-        | Term::Nonlinear(_)
-        | Term::Var(_) => Ok(Value::Term(term)),
-        Term::App(t1, t2) => {
-            let v1 = eval(*t1)?;
-            let v2 = eval(*t2)?;
-            let res = apply(v1, v2)?;
-            match res {
-                Value::Term(t) => eval(t),
-                Value::Superpos(mut s) => {
-                    s.merge();
-                    Ok(Value::Superpos(s))
+    // We do basic term-checking before evaluation to catch out linearity errors
+    match well_formed(&term) {
+        Err(e) => return Err(EvalError::LinearityViolation(e.into())),
+        Ok(_) => (),
+    }
+
+    fn helper(term: Term) -> Result<Value, EvalError> {
+        match term {
+            Term::Const(_)
+            | Term::Abs(_, _)
+            | Term::NonlinearAbs(_, _)
+            | Term::Nonlinear(_)
+            | Term::Var(_) => Ok(Value::Term(term)),
+            Term::App(t1, t2) => {
+                let v1 = helper(*t1)?;
+                let v2 = helper(*t2)?;
+                let res = apply(v1, v2)?;
+                match res {
+                    Value::Term(t) => helper(t),
+                    Value::Superpos(mut s) => {
+                        s.merge();
+                        Ok(Value::Superpos(s))
+                    }
                 }
             }
         }
     }
+    helper(term)
 }

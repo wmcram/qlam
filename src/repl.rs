@@ -1,6 +1,6 @@
 use crate::{
     examples::{load_qntmlib, load_stdlib},
-    helpers::{abs, app, nonlinear_abs},
+    helpers::{abs, app, nonlinear, nonlinear_abs},
     parser::parse,
     term::{Term, eval},
 };
@@ -99,7 +99,7 @@ pub fn populate_term(t: Term, env: &HashMap<String, Term>) -> Term {
         },
         Term::Abs(x, body) => abs(&x, populate_term(*body, env)),
         Term::NonlinearAbs(x, body) => nonlinear_abs(&x, populate_term(*body, env)),
-        Term::Nonlinear(t2) => populate_term(*t2, env),
+        Term::Nonlinear(t2) => nonlinear(populate_term(*t2, env)),
         Term::App(t1, t2) => app(populate_term(*t1, env), populate_term(*t2, env)),
     }
 }
