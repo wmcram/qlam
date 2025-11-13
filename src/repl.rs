@@ -1,13 +1,14 @@
 use crate::{
     examples::{load_qntmlib, load_stdlib},
+    helpers::{abs, app, nonlinear_abs},
     parser::parse,
-    term::{Value, eval},
+    term::{Term, eval},
 };
 use rustyline::{DefaultEditor, Result, error::ReadlineError};
 use std::collections::HashMap;
 
 pub struct Repl {
-    env: HashMap<String, Value>,
+    env: HashMap<String, Term>,
 }
 
 impl Repl {
@@ -19,12 +20,12 @@ impl Repl {
     }
 
     // Puts a symbol in the environment.
-    pub fn put_env(&mut self, name: String, value: Value) {
-        self.env.insert(name, value);
+    pub fn put_env(&mut self, name: String, term: Term) {
+        self.env.insert(name, term);
     }
 
     // Gets the mapping for a symbol.
-    pub fn get_env(&self, name: &str) -> Option<Value> {
+    pub fn get_env(&self, name: &str) -> Option<Term> {
         self.env.get(name).cloned()
     }
 
@@ -67,21 +68,39 @@ impl Repl {
 
         if let Some((name, term)) = line.split_once('=') {
             match parse(&mut term.trim().chars()) {
-                Ok(t) => match eval(t, &mut self.env) {
-                    Ok(v) => self.put_env(name.trim().into(), v),
-                    Err(e) => println!("Evaluation Error: {:?}", e),
-                },
+                Ok(t) => {
+                    let t = populate_term(t, &self.env);
+                    self.put_env(name.trim().into(), t);
+                }
                 Err(e) => println!("Parser Error: {:?}", e),
             }
         } else {
             match parse(&mut line.chars()) {
-                Ok(t) => match eval(t, &mut self.env) {
-                    Ok(v) => println!("{v}"),
-                    Err(e) => println!("Evaluation Error: {:?}", e),
-                },
+                Ok(t) => {
+                    let t = populate_term(t, &self.env);
+                    match eval(t) {
+                        Ok(v) => println!("{v}"),
+                        Err(e) => println!("Evaluation Error: {:?}", e),
+                    }
+                }
                 Err(e) => println!("Parser Error: {:?}", e),
             }
         }
+    }
+}
+
+// Replaces symbols in this term with their corresponding term in the environment.
+pub fn populate_term(t: Term, env: &HashMap<String, Term>) -> Term {
+    match t {
+        Term::Const(_) => t,
+        Term::Var(ref x) => match env.get(x) {
+            Some(t2) => t2.clone(),
+            None => t,
+        },
+        Term::Abs(x, body) => abs(&x, populate_term(*body, env)),
+        Term::NonlinearAbs(x, body) => nonlinear_abs(&x, populate_term(*body, env)),
+        Term::Nonlinear(t2) => populate_term(*t2, env),
+        Term::App(t1, t2) => app(populate_term(*t1, env), populate_term(*t2, env)),
     }
 }
 

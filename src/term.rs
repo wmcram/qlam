@@ -171,18 +171,71 @@ fn num_occurrences(x: &str, t: &Term) -> u32 {
     }
 }
 
-// Safely substitues t[x -> s].
-fn subst(t: &Term, x: &str, s: &Term, linear: bool) -> Result<Term, EvalError> {
-    // Check for ket substitution, in this case we need to ensure linearity holds
-    if linear {
-        if num_occurrences(x, t) != 1 {
-            return Err(EvalError::LinearityViolation(format!(
-                "substitution of `{}` in `{}`",
-                x, t
-            )));
-        }
+// Determines if a term is well-formed; that is, all free variables in nonlinear suspensions refer
+// to nonlinear variables in an outer lambda.
+fn well_formed(t: &Term) -> Result<(), String> {
+    #[derive(Clone, Copy, Debug)]
+    enum VarKind {
+        Linear(usize), // count uses
+        Nonlinear,
     }
 
+    fn check(term: &Term, vars: &mut HashMap<String, VarKind>) -> Result<(), String> {
+        match term {
+            Term::Var(x) => match vars.get_mut(x) {
+                Some(VarKind::Linear(count)) => {
+                    *count += 1;
+                    Ok(())
+                }
+                _ => Ok(()),
+            },
+
+            Term::Const(_) => Ok(()),
+
+            Term::Abs(x, body) => {
+                // linear binder: must appear exactly once
+                vars.insert(x.clone(), VarKind::Linear(0));
+                check(body, vars)?;
+                match vars.remove(x) {
+                    Some(VarKind::Linear(0)) => Err(format!("linear variable {x} unused")),
+                    Some(VarKind::Linear(1)) => Ok(()),
+                    Some(VarKind::Linear(n)) => Err(format!("linear variable {x} used {n} times")),
+                    _ => unreachable!(),
+                }
+            }
+
+            Term::NonlinearAbs(x, body) => {
+                vars.insert(x.clone(), VarKind::Nonlinear);
+                check(body, vars)?;
+                vars.remove(x);
+                Ok(())
+            }
+
+            Term::App(f, a) => {
+                check(f, vars)?;
+                check(a, vars)
+            }
+
+            Term::Nonlinear(t) => {
+                // inside !t, no linear vars may appear
+                let mut inner = vars.clone();
+                check(t, &mut inner)?;
+                for (x, kind) in inner {
+                    if let VarKind::Linear(n) = kind {
+                        if n > 0 {
+                            return Err(format!("linear variable {x} appears inside !"));
+                        }
+                    }
+                }
+                Ok(())
+            }
+        }
+    }
+    check(t, &mut HashMap::new())
+}
+
+// Safely substitues t[x -> s].
+fn subst(t: &Term, x: &str, s: &Term) -> Result<Term, EvalError> {
     // The recursive procedure for substitution.
     fn subst_helper(t: &Term, x: &str, s: &Term) -> Term {
         match t {
@@ -218,9 +271,12 @@ fn subst(t: &Term, x: &str, s: &Term, linear: bool) -> Result<Term, EvalError> {
 // Performs a classical beta reduction of two terms
 fn beta_reduce(t1: Term, t2: Term) -> Result<Term, EvalError> {
     match &t1 {
-        Term::Abs(x, body) => Ok(subst(body, x, &t2, true)?),
+        Term::Abs(x, body) => Ok(subst(body, x, &t2)?),
         Term::NonlinearAbs(x, body) => match &t2 {
-            Term::Nonlinear(t) => Ok(subst(body, x, t, false)?),
+            Term::Nonlinear(t) => {
+                well_formed(t).map_err(|e| EvalError::LinearityViolation(e.into()))?;
+                Ok(subst(body, x, t)?)
+            }
             _ => Err(EvalError::BadApplication(format!(
                 "Failure to beta-reduce nonlinear application {} {}: RHS was linear",
                 t1, t2
@@ -311,21 +367,19 @@ fn apply(v1: Value, v2: Value) -> Result<Value, EvalError> {
     }
 }
 
-pub fn eval(term: Term, env: &mut HashMap<String, Value>) -> Result<Value, EvalError> {
+pub fn eval(term: Term) -> Result<Value, EvalError> {
     match term {
-        Term::Const(_) | Term::Abs(_, _) | Term::NonlinearAbs(_, _) | Term::Nonlinear(_) => {
-            Ok(Value::Term(term))
-        }
-        Term::Var(ref x) => match env.get(x) {
-            Some(v) => Ok(v.clone()),
-            None => Err(EvalError::UndefinedSymbol(x.into())),
-        },
+        Term::Const(_)
+        | Term::Abs(_, _)
+        | Term::NonlinearAbs(_, _)
+        | Term::Nonlinear(_)
+        | Term::Var(_) => Ok(Value::Term(term)),
         Term::App(t1, t2) => {
-            let v1 = eval(*t1, env)?;
-            let v2 = eval(*t2, env)?;
+            let v1 = eval(*t1)?;
+            let v2 = eval(*t2)?;
             let res = apply(v1, v2)?;
             match res {
-                Value::Term(t) => eval(t, env),
+                Value::Term(t) => eval(t),
                 Value::Superpos(mut s) => {
                     s.merge();
                     Ok(Value::Superpos(s))
