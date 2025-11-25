@@ -4,6 +4,7 @@ use crate::repl::Repl;
 pub fn load_stdlib(repl: &mut Repl) {
     repl.read_line("id = #x. x");
     repl.read_line("pair = \\x.\\y.\\b.b x y");
+    repl.read_line("trip = \\x.\\y.\\z.\\f.f x y z");
     repl.read_line("swap = \\p.p (\\x.\\y. pair y x)")
 }
 
