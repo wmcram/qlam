@@ -1,4 +1,3 @@
-pub mod examples;
 pub mod helpers;
 pub mod parser;
 pub mod repl;

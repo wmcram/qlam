@@ -1,11 +1,11 @@
 use crate::{
-    examples::{load_qntmlib, load_stdlib},
     helpers::{abs, app, nonlinear, nonlinear_abs},
     parser::parse,
     term::{Term, eval},
 };
 use rustyline::{DefaultEditor, Result, error::ReadlineError};
-use std::collections::HashMap;
+use std::{collections::HashMap, fs::File};
+use std::{io::Read, path::Path};
 
 pub struct Repl {
     env: HashMap<String, Term>,
@@ -104,13 +104,28 @@ pub fn populate_term(t: Term, env: &HashMap<String, Term>) -> Term {
     }
 }
 
+// Loads the contents of the specified file into the environment line-by-line.
+fn load_file(path: &Path, repl: &mut Repl) -> std::io::Result<()> {
+    let mut file = File::open(path)?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+
+    for line in contents.lines() {
+        repl.read_line(line);
+    }
+
+    Ok(())
+}
+
 // Runs a new REPL until an error is encountered.
 pub fn repl() -> Result<()> {
     let mut rl = DefaultEditor::new()?;
     let mut repl = Repl::new();
 
-    load_stdlib(&mut repl);
-    load_qntmlib(&mut repl);
+    match load_file(Path::new("stdlib.conf"), &mut repl) {
+        Ok(_) => (),
+        Err(e) => println!("Failed to open stdlib.conf: {e}"),
+    }
 
     loop {
         match rl.readline("qlam> ") {

@@ -148,29 +148,6 @@ fn fresh_var(base: &str, in_use: &HashSet<String>) -> String {
     name
 }
 
-// Determines the number of occurences of variable x in this term.
-fn num_occurrences(x: &str, t: &Term) -> u32 {
-    match t {
-        Term::Var(y) => {
-            if x == y {
-                1
-            } else {
-                0
-            }
-        }
-        Term::Const(_) => 0,
-        Term::Abs(y, body) | Term::NonlinearAbs(y, body) => {
-            if x == y {
-                0
-            } else {
-                num_occurrences(x, body)
-            }
-        }
-        Term::App(t1, t2) => num_occurrences(x, t1) + num_occurrences(x, t2),
-        Term::Nonlinear(s) => num_occurrences(x, s),
-    }
-}
-
 // Determines if a term is well-formed; that is, all free variables in nonlinear suspensions refer
 // to nonlinear variables in an outer lambda.
 fn well_formed(t: &Term) -> Result<(), String> {
