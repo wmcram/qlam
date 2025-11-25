@@ -12,4 +12,9 @@ pub fn load_stdlib(repl: &mut Repl) {
 pub fn load_qntmlib(repl: &mut Repl) {
     repl.read_line("deutsch = \\U.(U (pair (H |0>) (H |1>))) (\\x.\\y. pair (H x) y)");
     repl.read_line("epr = C (pair (H |0>) |0>)");
+    repl.read_line("alice = \\p.C p (\\x'.\\y'.pair (H x') y')");
+    repl.read_line(
+        "bob = \\t.t (\\x'.\\y'.\\e.(C (pair y' e)) (\\y''.\\e'.(C (pair x' (H e'))) (\\x''.\\e''.trip (x'' y'' (H e'')))))",
+    );
+    repl.read_line("teleport = \\x.epr (\\e.\\e'.(alice x e) (\\x'.\\y'.bob (trip x' y' e')))");
 }

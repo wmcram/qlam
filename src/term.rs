@@ -392,9 +392,10 @@ pub fn eval(term: Term) -> Result<Value, EvalError> {
                 let res = apply(v1, v2)?;
                 match res {
                     Value::Term(t) => helper(t),
-                    Value::Superpos(mut s) => {
-                        s.merge();
-                        Ok(Value::Superpos(s))
+                    Value::Superpos(s) => {
+                        let mut s_new = s.map_terms(eval)?;
+                        s_new.merge();
+                        Ok(Value::Superpos(s_new))
                     }
                 }
             }
