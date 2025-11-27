@@ -232,7 +232,7 @@ fn subst(t: &Term, x: &str, s: &Term) -> Result<Term, EvalError> {
                 }
             }
             Term::Const(_) => t.clone(),
-            Term::Abs(y, body) | Term::NonlinearAbs(y, body) => {
+            Term::Abs(y, body) => {
                 // shadowed case
                 if y == x {
                     t.clone()
@@ -243,6 +243,19 @@ fn subst(t: &Term, x: &str, s: &Term) -> Result<Term, EvalError> {
                     abs(&fresh, subst_helper(&renamed_body, x, s))
                 } else {
                     abs(&y, subst_helper(body, x, s))
+                }
+            }
+            Term::NonlinearAbs(y, body) => {
+                // shadowed case
+                if y == x {
+                    t.clone()
+                } else if free_vars(s).contains(y) {
+                    let used: HashSet<_> = free_vars(body).union(&free_vars(s)).cloned().collect();
+                    let fresh = fresh_var(y, &used);
+                    let renamed_body = subst_helper(body, y, &Term::Var(fresh.clone()));
+                    nonlinear_abs(&fresh, subst_helper(&renamed_body, x, s))
+                } else {
+                    nonlinear_abs(&y, subst_helper(body, x, s))
                 }
             }
             Term::App(a, b) => app(subst_helper(a, x, s), subst_helper(b, x, s)),
