@@ -37,6 +37,10 @@ fn tokenize(input: &mut Chars) -> Vec<Token> {
             ')' => next_token = Some(Token::RPar(pos)),
             '|' => next_token = Some(Token::LKet(pos)),
             '>' => next_token = Some(Token::RKet(pos)),
+            '0' | '1' if !cur.is_empty() => {
+                cur.push(c);
+                continue;
+            }
             '0' => next_token = Some(Token::Bit(pos, false)),
             '1' => next_token = Some(Token::Bit(pos, true)),
             'H' => next_token = Some(Token::Gate("H".into())),
