@@ -14,7 +14,8 @@ enum Block {
     C,
 }
 
-enum CircuitError {
+#[derive(Debug, Clone, Copy)]
+pub enum CircuitError {
     EmptyCircuit,
     InvalidChar,
     DimMismatch,
@@ -27,7 +28,7 @@ enum CircuitError {
 // Each subsequent line should be the gates to apply for a certain layer, ordered top to bottom.
 // For example, the line 'H T C' will apply a Hadamard to the first wire, T to the second, and
 // a CNOT on the third and fourth wires.
-fn parse_circuit(text: &str) -> Result<Circuit, CircuitError> {
+pub fn parse_circuit(text: &str) -> Result<Circuit, CircuitError> {
     // Parse input layer
     let mut input = Vec::new();
     let mut lines = text.lines();
@@ -85,11 +86,11 @@ fn parse_circuit(text: &str) -> Result<Circuit, CircuitError> {
 
 impl Circuit {
     // Compiles a circuit down to an equivalent lambda term.
-    pub fn circuit_to_lambda(c: &Circuit) -> Result<Term, ParseError> {
+    pub fn to_lambda(&self) -> Result<Term, ParseError> {
         // Following this block, input will be a church-encoded n-tuple representing
         // the input layer.
         let mut input = "(\\f.f".to_string();
-        for b in &c.input {
+        for b in &self.input {
             if *b {
                 input += " |1>";
             } else {
@@ -101,9 +102,9 @@ impl Circuit {
         // Construct a layer to apply to the above n-tuple in continuation-passing style.
         let mut layers: Vec<String> = vec![input];
 
-        for layer in &c.layers {
+        for layer in &self.layers {
             let mut cur = "(".to_string();
-            for i in 0..c.input.len() {
+            for i in 0..self.input.len() {
                 cur += &format!("\\.x{i}");
             }
             cur += "\\f.f";
@@ -115,6 +116,7 @@ impl Circuit {
                     Block::I => (),
                     Block::H => cur += "H ",
                     Block::T => cur += "T ",
+                    // TODO
                     Block::C => unimplemented!(),
                 }
 
