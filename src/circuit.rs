@@ -103,12 +103,32 @@ impl Circuit {
         let mut layers: Vec<String> = vec![input];
 
         for layer in &self.layers {
+            // Gather up the CNOT indices to move them to the front
+            let mut cnots = Vec::new();
+            let mut idx = 0;
+            for block in layer {
+                match block {
+                    Block::C => {
+                        cnots.push((idx, idx + 1));
+                        idx += 2
+                    }
+                    _ => idx += 1,
+                }
+            }
+
+            // Construct the prefix
             let mut cur = "(".to_string();
             for i in 0..self.input.len() {
-                cur += &format!("\\.x{i}");
+                cur += &format!("\\x{i}.");
+            }
+
+            // Create the CNOT chain
+            for (q1, q2) in &cnots {
+                cur += &format!("(C (pair x{q1} x{q2}))");
+                cur += &format!(" (\\'x{q1}.\\'x{q2}.");
             }
             cur += "\\f.f";
-
+            // Apply the single-qubit gates
             let mut idx = 0;
             for block in layer {
                 cur += " (";
@@ -116,19 +136,20 @@ impl Circuit {
                     Block::I => (),
                     Block::H => cur += "H ",
                     Block::T => cur += "T ",
-                    // TODO
-                    Block::C => unimplemented!(),
+                    Block::C => {
+                        cur += &format!("'x{idx})");
+                        idx += 1;
+                        cur += &format!(" ('x{idx})");
+                        idx += 1;
+                        continue;
+                    }
                 }
 
                 cur += &format!("x{idx})");
-
-                match block {
-                    Block::C => idx += 2,
-                    _ => idx += 1,
-                }
+                idx += 1;
             }
 
-            cur += ")";
+            cur += &")".repeat(1 + cnots.len());
             layers.push(cur);
         }
 
