@@ -1,3 +1,4 @@
+use crate::parser::{ParseError, parse};
 use crate::term::Term;
 
 pub struct Circuit {
@@ -20,6 +21,12 @@ enum CircuitError {
 }
 
 // Parses a textual circuit into memory.
+// The format is given by a series of lines.
+// The first line should be the input layer of the circuit,
+// which must be computational basis states '0' or '1'.
+// Each subsequent line should be the gates to apply for a certain layer, ordered top to bottom.
+// For example, the line 'H T C' will apply a Hadamard to the first wire, T to the second, and
+// a CNOT on the third and fourth wires.
 fn parse_circuit(text: &str) -> Result<Circuit, CircuitError> {
     // Parse input layer
     let mut input = Vec::new();
@@ -61,10 +68,8 @@ fn parse_circuit(text: &str) -> Result<Circuit, CircuitError> {
         let mut acc = 0;
         for block in layer {
             match block {
-                Block::I => acc += 1,
-                Block::H => acc += 1,
-                Block::T => acc += 1,
                 Block::C => acc += 2,
+                _ => acc += 1,
             }
         }
         if acc != dim {
@@ -78,7 +83,54 @@ fn parse_circuit(text: &str) -> Result<Circuit, CircuitError> {
     })
 }
 
-// Compiles a circuit down to an equivalent lambda term.
-fn circuit_to_lambda(c: &Circuit) -> Term {
-    todo!()
+impl Circuit {
+    // Compiles a circuit down to an equivalent lambda term.
+    pub fn circuit_to_lambda(c: &Circuit) -> Result<Term, ParseError> {
+        // Following this block, input will be a church-encoded n-tuple representing
+        // the input layer.
+        let mut input = "(\\f.f".to_string();
+        for b in &c.input {
+            if *b {
+                input += " |1>";
+            } else {
+                input += " |0>";
+            }
+        }
+        input += ") ";
+
+        // Construct a layer to apply to the above n-tuple in continuation-passing style.
+        let mut layers: Vec<String> = vec![input];
+
+        for layer in &c.layers {
+            let mut cur = "(".to_string();
+            for i in 0..c.input.len() {
+                cur += &format!("\\.x{i}");
+            }
+            cur += "\\f.f";
+
+            let mut idx = 0;
+            for block in layer {
+                cur += " (";
+                match block {
+                    Block::I => (),
+                    Block::H => cur += "H ",
+                    Block::T => cur += "T ",
+                    Block::C => unimplemented!(),
+                }
+
+                cur += &format!("x{idx})");
+
+                match block {
+                    Block::C => idx += 2,
+                    _ => idx += 1,
+                }
+            }
+
+            cur += ")";
+            layers.push(cur);
+        }
+
+        let full_str = layers.join(" ");
+        return parse(&mut full_str.chars());
+    }
 }
