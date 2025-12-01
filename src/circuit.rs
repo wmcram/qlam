@@ -12,6 +12,7 @@ enum Block {
     H,
     T,
     C,
+    S,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -55,6 +56,7 @@ pub fn parse_circuit(text: &str) -> Result<Circuit, CircuitError> {
                 'H' => cur.push(Block::H),
                 'T' => cur.push(Block::T),
                 'C' => cur.push(Block::C),
+                'S' => cur.push(Block::S),
                 c if c.is_whitespace() => continue,
                 _ => return Err(CircuitError::InvalidChar),
             }
@@ -69,7 +71,7 @@ pub fn parse_circuit(text: &str) -> Result<Circuit, CircuitError> {
         let mut acc = 0;
         for block in layer {
             match block {
-                Block::C => acc += 2,
+                Block::C | Block::S => acc += 2,
                 _ => acc += 1,
             }
         }
@@ -103,15 +105,16 @@ impl Circuit {
         let mut layers: Vec<String> = vec![input];
 
         for layer in &self.layers {
-            // Gather up the CNOT indices to move them to the front
+            // Gather up the CNOT and SWAP indices to move them to the front
             let mut cnots = Vec::new();
-            let mut idx = 0;
+            let mut idx: usize = 0;
             for block in layer {
                 match block {
                     Block::C => {
                         cnots.push((idx, idx + 1));
                         idx += 2
                     }
+                    Block::S => idx += 2,
                     _ => idx += 1,
                 }
             }
@@ -128,7 +131,8 @@ impl Circuit {
                 cur += &format!(" (\\'x{q1}.\\'x{q2}.");
             }
             cur += "\\f.f";
-            // Apply the single-qubit gates
+
+            // Construct the output tuple
             let mut idx = 0;
             for block in layer {
                 cur += " (";
@@ -141,6 +145,14 @@ impl Circuit {
                         idx += 1;
                         cur += &format!(" ('x{idx})");
                         idx += 1;
+                        continue;
+                    }
+                    Block::S => {
+                        idx += 1;
+                        cur += &format!("x{idx})");
+                        idx -= 1;
+                        cur += &format!(" (x{idx})");
+                        idx += 2;
                         continue;
                     }
                 }
