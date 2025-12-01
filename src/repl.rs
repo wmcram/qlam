@@ -4,7 +4,7 @@ use crate::{
     term::{Term, eval},
 };
 use rustyline::{DefaultEditor, Result, error::ReadlineError};
-use std::{collections::HashMap, fs::File};
+use std::{collections::HashMap, fs::File, process::exit};
 use std::{io::Read, path::Path};
 
 pub struct Repl {
@@ -45,6 +45,9 @@ impl Repl {
     pub fn read_line(&mut self, line: &str) {
         // Check for keyword commands
         match line {
+            "quit" => {
+                exit(0);
+            }
             "env" => {
                 self.print_env();
                 return;

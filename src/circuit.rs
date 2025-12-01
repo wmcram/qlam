@@ -165,6 +165,18 @@ impl Circuit {
             layers.push(cur);
         }
 
+        // last layer will force all components
+        let mut forcer = "(".to_string();
+        for i in 0..self.input.len() {
+            forcer += &format!("\\x{i}.");
+        }
+        forcer += "\\f.f";
+        for i in 0..self.input.len() {
+            forcer += &format!(" x{i}");
+        }
+        forcer += ")";
+        layers.push(forcer);
+
         let full_str = layers.join(" ");
         return parse(&mut full_str.chars());
     }
