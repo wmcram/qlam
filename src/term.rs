@@ -148,6 +148,19 @@ fn fresh_var(base: &str, in_use: &HashSet<String>) -> String {
     name
 }
 
+// Determines if a term contains a ket |0> or |1>.
+fn contains_ket(t: &Term) -> bool {
+    match t {
+        Term::Var(_) => false,
+        Term::Const(Const::Ket(_)) => true,
+        Term::Const(_) => false,
+        Term::Abs(_, body) => contains_ket(body),
+        Term::NonlinearAbs(_, body) => contains_ket(body),
+        Term::App(t1, t2) => contains_ket(t1) || contains_ket(t2),
+        Term::Nonlinear(t) => contains_ket(t),
+    }
+}
+
 // Determines if a term is well-formed; that is, all free variables in nonlinear suspensions refer
 // to nonlinear variables in an outer lambda.
 fn well_formed(t: &Term) -> Result<(), String> {
@@ -202,6 +215,10 @@ fn well_formed(t: &Term) -> Result<(), String> {
             }
 
             Term::Nonlinear(t) => {
+                if contains_ket(t) {
+                    return Err(format!("ket appears inside !"));
+                }
+
                 let mut inner = vars.clone();
                 check(t, &mut inner)?;
                 for (x, kind) in inner {
