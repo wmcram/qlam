@@ -48,7 +48,7 @@ impl Term {
 
     fn as_app(&self) -> Option<(&Term, &Term)> {
         if let Term::App(l, r) = self {
-            Some((&*l, &*r))
+            Some((l, r))
         } else {
             None
         }
@@ -56,7 +56,7 @@ impl Term {
 
     fn as_abs(&self) -> Option<(&str, &Term)> {
         if let Term::Abs(x, body) = self {
-            Some((x.as_str(), &*body))
+            Some((x.as_str(), body))
         } else {
             None
         }
@@ -67,11 +67,10 @@ impl Term {
         let (left, b) = body.as_app()?;
         let (right, a) = left.as_app()?;
 
-        if let Some(v) = right.as_var() {
-            if v == x {
+        if let Some(v) = right.as_var()
+            && v == x {
                 return Some((a, b));
             }
-        }
         None
     }
 
@@ -216,17 +215,16 @@ fn well_formed(t: &Term) -> Result<(), String> {
 
             Term::Nonlinear(t) => {
                 if contains_ket(t) {
-                    return Err(format!("ket appears inside !"));
+                    return Err("ket appears inside !".to_string());
                 }
 
                 let mut inner = vars.clone();
                 check(t, &mut inner)?;
                 for (x, kind) in inner {
-                    if let VarKind::Linear(n) = kind {
-                        if n > 0 {
+                    if let VarKind::Linear(n) = kind
+                        && n > 0 {
                             return Err(format!("linear variable {x} appears inside !"));
                         }
-                    }
                 }
                 Ok(())
             }
@@ -259,7 +257,7 @@ fn subst(t: &Term, x: &str, s: &Term) -> Result<Term, EvalError> {
                     let renamed_body = subst_helper(body, y, &Term::Var(fresh.clone()));
                     abs(&fresh, subst_helper(&renamed_body, x, s))
                 } else {
-                    abs(&y, subst_helper(body, x, s))
+                    abs(y, subst_helper(body, x, s))
                 }
             }
             Term::NonlinearAbs(y, body) => {
@@ -272,7 +270,7 @@ fn subst(t: &Term, x: &str, s: &Term) -> Result<Term, EvalError> {
                     let renamed_body = subst_helper(body, y, &Term::Var(fresh.clone()));
                     nonlinear_abs(&fresh, subst_helper(&renamed_body, x, s))
                 } else {
-                    nonlinear_abs(&y, subst_helper(body, x, s))
+                    nonlinear_abs(y, subst_helper(body, x, s))
                 }
             }
             Term::App(a, b) => app(subst_helper(a, x, s), subst_helper(b, x, s)),
@@ -381,10 +379,7 @@ fn apply(v1: Value, v2: Value) -> Result<Value, EvalError> {
 
 pub fn eval(term: Term) -> Result<Value, EvalError> {
     // We do basic term-checking before evaluation to catch out linearity errors
-    match well_formed(&term) {
-        Err(e) => return Err(EvalError::LinearityViolation(e.into())),
-        Ok(_) => (),
-    }
+    if let Err(e) = well_formed(&term) { return Err(EvalError::LinearityViolation(e)) }
 
     fn helper(term: Term) -> Result<Value, EvalError> {
         match term {

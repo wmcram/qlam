@@ -11,6 +11,12 @@ pub struct Repl {
     env: HashMap<String, Term>,
 }
 
+impl Default for Repl {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Repl {
     // Creates a new Repl with an empty environment.
     pub fn new() -> Self {
@@ -142,7 +148,7 @@ pub fn repl() -> Result<()> {
             Err(ReadlineError::Eof) | Err(ReadlineError::Interrupted) => {
                 break;
             }
-            Err(e) => return Err(e.into()),
+            Err(e) => return Err(e),
         }
     }
     Ok(())

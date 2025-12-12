@@ -25,7 +25,7 @@ fn tokenize(input: &mut Chars) -> Vec<Token> {
     let mut cur = String::new();
     let mut pos = 0;
 
-    while let Some(c) = input.next() {
+    for c in input.by_ref() {
         pos += 1;
         let mut next_token = None;
         match c {
@@ -53,18 +53,15 @@ fn tokenize(input: &mut Chars) -> Vec<Token> {
             }
         }
 
-        if cur.len() > 0 {
+        if !cur.is_empty() {
             res.push(Token::Var(cur));
             cur = String::new();
         }
 
-        match next_token {
-            Some(token) => res.push(token),
-            None => (),
-        }
+        if let Some(token) = next_token { res.push(token) }
     }
 
-    if cur.len() > 0 {
+    if !cur.is_empty() {
         res.push(Token::Var(cur));
     }
 
@@ -183,9 +180,9 @@ fn parse_tokens(tokens: &[Token]) -> Result<Term, ParseError> {
     }
 
     if res.len() == 1 {
-        Ok(res.into_iter().nth(0).unwrap())
+        Ok(res.into_iter().next().unwrap())
     } else {
-        match res.into_iter().reduce(|acc, item| app(acc, item)) {
+        match res.into_iter().reduce(app) {
             Some(res) => Ok(res),
             None => Err(ParseError::EmptyList),
         }

@@ -81,8 +81,8 @@ pub fn parse_circuit(text: &str) -> Result<Circuit, CircuitError> {
     }
 
     Ok(Circuit {
-        layers: layers,
-        input: input,
+        layers,
+        input,
     })
 }
 
@@ -178,6 +178,6 @@ impl Circuit {
         layers.push(forcer);
 
         let full_str = layers.join(" ");
-        return parse(&mut full_str.chars());
+        parse(&mut full_str.chars())
     }
 }
